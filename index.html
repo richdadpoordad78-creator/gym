@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#fefafd">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gym board">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Gym board</title>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--ink:#16181d;--mute:#8a909c;--line:#e7e9ee;--fill:#eceef2;--ok:#1f9d55;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0f12;--card:#17191e;--ink:#f0f2f5;--mute:#8a909c;--line:#272a31;--fill:#23262d;--ok:#3fbf78}}
+:root[data-theme="dark"]{--bg:#0e0f12;--card:#17191e;--ink:#f0f2f5;--mute:#8a909c;--line:#272a31;--fill:#23262d;--ok:#3fbf78}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;padding:16px}
+.card{max-width:460px;margin:0 auto;background:var(--card);border-radius:28px;padding:24px 18px 18px}
+header{display:flex;justify-content:space-between;align-items:baseline;padding:0 6px;margin-bottom:18px}
+h1{font-size:28px;margin:0;font-weight:600;letter-spacing:-.3px}
+#pw{font-size:15px;color:var(--mute)}
+.row{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:20px;padding:12px 12px 12px 18px;margin-bottom:10px;min-height:64px}
+.day{width:34px;font-size:13px;font-weight:500;letter-spacing:.4px;color:var(--mute);flex:none}
+.row.today .day{color:var(--ink);font-weight:700}
+.col{flex:1;min-width:0}
+.name{width:100%;border:0;background:transparent;color:var(--ink);font:500 18px Roboto,system-ui,sans-serif;padding:0;outline:none}
+.seals{display:flex;flex-wrap:wrap;gap:2px;margin-top:5px}
+.seals:empty{display:none}
+.seals svg{width:18px;height:18px;fill:var(--ok)}
+.tick{flex:none;width:38px;height:38px;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:transparent;display:grid;place-items:center;cursor:pointer;padding:0}
+.tick svg{width:18px;height:18px}
+.tick.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.tick:disabled{opacity:.4;cursor:default}
+.prog{margin:20px 6px 0}
+.ptitle{font-size:13px;color:var(--mute);margin-bottom:10px;display:flex;justify-content:space-between}
+.grid{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}
+.cell{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--mute)}
+.cell .bar{width:100%;height:44px;background:var(--fill);border-radius:6px;display:flex;align-items:flex-end;overflow:hidden}
+.cell .bar i{display:block;width:100%;background:var(--ok)}
+.cell.now{color:var(--ink);font-weight:700}
+footer{display:flex;justify-content:flex-end;margin:18px 6px 0}
+.reset{border:0;background:transparent;color:var(--mute);font:500 14px Roboto,system-ui,sans-serif;cursor:pointer;padding:6px 0}
+</style>
+</head>
+<body>
+<div class="card">
+  <header><h1>Gym board</h1><div id="pw"></div></header>
+  <div id="rows"></div>
+  <div class="prog"><div class="ptitle"><span>10-week progress</span><span id="wk2"></span></div><div class="grid" id="grid"></div></div>
+  <footer><button class="reset" id="reset">Reset</button></footer>
+</div>
+<script>
+var DAYS=["MON","TUE","WED","THU","FRI","SAT","SUN"];
+var DEF=["Back","Biceps","Chest","Triceps","Shoulder","Leg","Rest"];
+var KEY="gymboard-v1";
+function fresh(){return{names:DEF.slice(),seals:[[],[],[],[],[],[],[]],start:WK}}
+function pad(n){return n<10?"0"+n:""+n}
+function weekKey(d){var x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-(x.getDay()+6)%7);return x.getFullYear()+"-"+pad(x.getMonth()+1)+"-"+pad(x.getDate())}
+var now=new Date(),WK=weekKey(now),TODAY=(now.getDay()+6)%7;
+var state=fresh();
+try{var s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&s.names&&s.seals)state=s}catch(e){}
+if(!state.start)state.start=WK;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+var SEAL='<svg viewBox="0 0 24 24">'+(function(){var p="";for(var k=0;k<12;k++){var a=k*Math.PI/6;p+='<circle cx="'+(12+8.2*Math.cos(a)).toFixed(2)+'" cy="'+(12+8.2*Math.sin(a)).toFixed(2)+'" r="3.4"/>'}return p})()+'<circle cx="12" cy="12" r="8.6"/><path d="M8 12.3l2.8 2.8L16.2 9.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+var CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+function render(){
+  var h="",done=0;
+  for(var i=0;i<7;i++){
+    var n=state.seals[i].length,has=state.seals[i].indexOf(WK)>-1;
+    if(has)done++;
+    h+='<div class="row'+(i===TODAY?' today':'')+'"><div class="day">'+DAYS[i]+'</div><div class="col"><input class="name" data-i="'+i+'" maxlength="20" aria-label="Workout for '+DAYS[i]+'"><div class="seals">'+new Array(n+1).join(SEAL)+'</div></div><button class="tick'+(has?' done':'')+'" data-t="'+i+'"'+(i>TODAY?' disabled':'')+' aria-label="Mark '+DAYS[i]+' done">'+CHECK+'</button></div>';
+  }
+  document.getElementById("rows").innerHTML=h;
+  document.querySelectorAll(".name").forEach(function(el){el.value=state.names[+el.dataset.i]});
+  var sd=new Date(state.start+"T00:00:00");
+  var cur=Math.round((new Date(WK+"T00:00:00")-sd)/6048e5)+1;
+  document.getElementById("pw").textContent=cur>10?"10 weeks done":"Week "+Math.max(cur,1)+" of 10";
+  document.getElementById("wk2").textContent=done+"/7 this week";
+  var g="";
+  for(var w=0;w<10;w++){
+    var wk=weekKey(new Date(sd.getFullYear(),sd.getMonth(),sd.getDate()+w*7)),c=0;
+    for(var q=0;q<7;q++)if(state.seals[q].indexOf(wk)>-1)c++;
+    g+='<div class="cell'+(w+1===cur?' now':'')+'"><div class="bar"><i style="height:'+(c/7*100)+'%"></i></div>'+(w+1)+'</div>';
+  }
+  document.getElementById("grid").innerHTML=g;
+}
+document.getElementById("rows").addEventListener("click",function(e){
+  var b=e.target.closest(".tick");if(!b||b.disabled)return;
+  var i=+b.dataset.t,k=state.seals[i].indexOf(WK);
+  if(k>-1)state.seals[i].splice(k,1);else state.seals[i].push(WK);
+  save();render();
+});
+document.getElementById("rows").addEventListener("change",function(e){
+  if(e.target.classList.contains("name")){var i=+e.target.dataset.i;state.names[i]=e.target.value.trim()||DEF[i];save();render()}
+});
+var rb=document.getElementById("reset");
+rb.addEventListener("click",function(){
+  if(rb.dataset.arm){state=fresh();save();render();rb.textContent="Reset";delete rb.dataset.arm;return}
+  rb.dataset.arm=1;rb.textContent="Tap again to clear everything";
+  setTimeout(function(){rb.textContent="Reset";delete rb.dataset.arm},3000);
+});
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
+render();
+</script>
+</body>
+</html>
